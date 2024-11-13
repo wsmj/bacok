@@ -29,23 +29,12 @@ public:
 		sensor_combined_subscriber_ = this->create_subscription<SensorGps>("/fmu/out/vehicle_gps_position", qos, std::bind(&OffboardControl::sensor_combined_callback, this, _1));
 		Vehicle_attitude_subscriber_ = this->create_subscription<VehicleAttitude>("/fmu/out/vehicle_attitude", qos, std::bind(&OffboardControl::attitude_callback, this, _1));
 
-
-		offboard_setpoint_counter_ = 0;
-
 		auto timer_callback = [this]() -> void {
+			RCLCPP_INFO(this->get_logger(), "W: ", attitude_data->q[0]);
+			RCLCPP_INFO(this->get_logger(), "X: ", attitude_data->q[1]);
+			RCLCPP_INFO(this->get_logger(), "Y: ", attitude_data->q[2]);
+			RCLCPP_INFO(this->get_logger(), "Z: ", attitude_data->q[3]);
 
-			if (offboard_setpoint_counter_ == 10) {
-				// Change to Offboard mode after 10 setpoints
-				// this->publish_vehicle_command(VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 6);
-			}
-
-			// publish_offboard_control_mode();
-			// publish_vehicle_attitude_setpoint();
-
-			// stop the counter after reaching 11
-			if (offboard_setpoint_counter_ < 11) {
-				offboard_setpoint_counter_++;
-			}
 		};
 		timer_ = this->create_wall_timer(100ms, timer_callback);
 	}
@@ -58,20 +47,14 @@ private:
 
 	std::atomic<uint64_t> timestamp_;   
 
-	uint64_t offboard_setpoint_counter_;  
 
 	SensorGps::SharedPtr sensor_data;
 	void sensor_combined_callback(const SensorGps::SharedPtr msg) {sensor_data = msg;}
 
-    // VehicleAttitude::SharedPtr attsitude_data;
-    void attitude_callback(const VehicleAttitude::SharedPtr msg) {
-		Eigen::Quaterniond q(msg->q[0], msg->q[1], msg->q[2], msg->q[3]);
-		// q.normalize();
-		Eigen::Vector3d euler = quaternion::quaternion_to_euler(q);
+    VehicleAttitude::SharedPtr attitude_data;
+    void attitude_callback(const VehicleAttitude::SharedPtr msg) {attitude_data = msg;}
 
-		RCLCPP_INFO(this->get_logger(), "euler: %f, %f, %f", euler[0], euler[1], euler[2]);
-		RCLCPP_INFO(this->get_logger(), "quater: %f, %f, %f, %f", msg->q[0], msg->q[1], msg->q[2], msg->q[3]);
-    }
+	
 };
 
 

@@ -51,11 +51,6 @@ target_link_libraries(offboard_dubins dubinsPath frameTransport)
 install(TARGETS offboard_dubins
   DESTINATION lib/${PROJECT_NAME})
 
-add_executable(test_frame src/test.cpp)
-ament_target_dependencies(test_frame rclcpp)
-target_link_libraries(test_frame frameTransport)
-install(TARGETS test_frame
-  DESTINATION lib/${PROJECT_NAME})
 
 ament_export_include_directories(include)
 ament_export_libraries(dubinsPath)
