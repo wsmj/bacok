@@ -3,7 +3,7 @@
 
 #include <cmath>
 
-class QuaternionConversion {
+class FrameTransport {
 public:
     struct Quaternion {
         double w, x, y, z;

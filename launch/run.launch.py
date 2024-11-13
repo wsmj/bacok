@@ -25,11 +25,11 @@ def generate_launch_description():
                 ('/fmu/out/vehicle_gps_position', '/px4_1/fmu/out/vehicle_gps_position')
 
             ]
-        ),
-        ExecuteProcess(
-            cmd=['MicroXRCEAgent', 'udp4', '-p', '8888'],
-            output='screen'
         )
+        # ExecuteProcess(
+        #     cmd=['MicroXRCEAgent', 'udp4', '-p', '8888'],
+        #     output='screen'
+        # )
         # ExecuteProcess(
         #     cmd=['./build/px4_sitl_default/bin/px4', '-i', '1'],
         #     output='screen',

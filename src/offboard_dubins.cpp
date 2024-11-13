@@ -30,10 +30,24 @@ public:
 		Vehicle_attitude_subscriber_ = this->create_subscription<VehicleAttitude>("/fmu/out/vehicle_attitude", qos, std::bind(&OffboardControl::attitude_callback, this, _1));
 
 		auto timer_callback = [this]() -> void {
-			RCLCPP_INFO(this->get_logger(), "W: ", attitude_data->q[0]);
-			RCLCPP_INFO(this->get_logger(), "X: ", attitude_data->q[1]);
-			RCLCPP_INFO(this->get_logger(), "Y: ", attitude_data->q[2]);
-			RCLCPP_INFO(this->get_logger(), "Z: ", attitude_data->q[3]);
+			RCLCPP_INFO(this->get_logger(), "W: %f", attitude_data->q[0]);
+			RCLCPP_INFO(this->get_logger(), "X: %f", attitude_data->q[1]);
+			RCLCPP_INFO(this->get_logger(), "Y: %f", attitude_data->q[2]);
+			RCLCPP_INFO(this->get_logger(), "Z: %f", attitude_data->q[3]);
+			
+			FrameTransport::Quaternion quaternion;
+			quaternion.w = attitude_data->q[0];
+			quaternion.x = attitude_data->q[1];
+			quaternion.y = attitude_data->q[2];
+			quaternion.z = attitude_data->q[3];
+
+			FrameTransport::Euler euler = FrameTransport::toEuler(quaternion);
+			RCLCPP_INFO(this->get_logger(), "roll: %f", euler.roll*180/M_PI);
+			RCLCPP_INFO(this->get_logger(), "pitch: %f", euler.pitch*180/M_PI);
+			RCLCPP_INFO(this->get_logger(), "yaw: %f", euler.yaw*180/M_PI);
+			RCLCPP_INFO(this->get_logger(), "\n\n\n");
+
+			
 
 		};
 		timer_ = this->create_wall_timer(100ms, timer_callback);

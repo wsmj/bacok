@@ -29,6 +29,12 @@ target_include_directories(frameTransport PUBLIC
   $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
 )
 
+add_library(geolocation SHARED src/lib/geolocation.cpp)
+ament_target_dependencies(geolocation)
+target_include_directories(geolocation PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/${PROJECT_NAME}>
+  $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
+)
 
 add_executable(attitude_control src/attitude_control.cpp)
 ament_target_dependencies(attitude_control rclcpp px4_msgs)
@@ -55,6 +61,7 @@ install(TARGETS offboard_dubins
 ament_export_include_directories(include)
 ament_export_libraries(dubinsPath)
 ament_export_libraries(frameTransport)
+ament_export_libraries(geolocation)
 
 install(DIRECTORY
   launch
@@ -75,6 +82,12 @@ install(TARGETS frameTransport
 	INCLUDES DESTINATION include
 )
 
+install(TARGETS geolocation
+	ARCHIVE DESTINATION lib
+	LIBRARY DESTINATION lib
+	RUNTIME DESTINATION bin
+	INCLUDES DESTINATION include
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

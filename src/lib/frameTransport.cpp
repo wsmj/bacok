@@ -1,6 +1,6 @@
 #include "bacok/frameTransport.h"
 
-QuaternionConversion::Euler QuaternionConversion::toEuler(const Quaternion& q) {
+FrameTransport::Euler FrameTransport::toEuler(const Quaternion& q) {
     Euler euler;
 
     euler.roll = atan2(2 * (q.w * q.x + q.y * q.z), 1 - 2 * (q.x * q.x + q.y * q.y));
@@ -10,7 +10,7 @@ QuaternionConversion::Euler QuaternionConversion::toEuler(const Quaternion& q) {
     return euler;
 }
 
-QuaternionConversion::Quaternion QuaternionConversion::toQuaternion(const Euler& e) {
+FrameTransport::Quaternion FrameTransport::toQuaternion(const Euler& e) {
     Quaternion q;
 
     double cy = cos(e.yaw * 0.5);
