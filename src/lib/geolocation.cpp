@@ -1,5 +1,7 @@
 #include <bacok/geolocation.h>
 
+namespace geo_utils {
+
 double Geolocation::degreesToRadians(double degrees) {
     return degrees * M_PI / 180.0;
 }
@@ -8,25 +10,11 @@ double Geolocation::radiansToDegrees(double radians) {
     return radians * 180.0 / M_PI;
 }
 
-double Geolocation::haversine(const Coordinate& current_coordinate, const Coordinate& target_coordinate) {
-    double t_lat = radiansToDegrees(target_coordinate.lat);
-    double t_lon = radiansToDegrees(target_coordinate.lon);
-    double c_lat = radiansToDegrees(current_coordinate.lat);
-    double c_lon = radiansToDegrees(current_coordinate.lon);
-    double d_lat = t_lat - c_lat;
-    double d_lon = t_lon - c_lon;
-
-    double a = std::sin(d_lat / 2) * std::sin(d_lat / 2) +
-               std::cos(c_lat) * std::cos(t_lat) * std::sin(d_lon / 2) * std::sin(d_lon / 2);
-    double c = 2 * std::atan2(std::sqrt(a), std::sqrt(1 - a));
-    return earthRadius * c;
-}
-
-std::pair<double, double> Geolocation::haversineXY(const Coordinate& target, const Coordinate& current) {
-    double t_lat = radiansToDegrees(target.lat);
-    double t_lon = radiansToDegrees(target.lon);
-    double c_lat = radiansToDegrees(current.lat);
-    double c_lon = radiansToDegrees(current.lon);
+Position Geolocation::haversine(const Coordinate& current_coordinate, const Coordinate& target_coordinate) {
+    double t_lat = degreesToRadians(target_coordinate.lat);
+    double t_lon = degreesToRadians(target_coordinate.lon);
+    double c_lat = degreesToRadians(current_coordinate.lat);
+    double c_lon = degreesToRadians(current_coordinate.lon);
 
     double d_lat = t_lat - c_lat;
     double y = earthRadius * d_lat;
@@ -34,14 +22,20 @@ std::pair<double, double> Geolocation::haversineXY(const Coordinate& target, con
     double d_lon = t_lon - c_lon;
     double x = earthRadius * d_lon * std::cos(c_lat);
 
-    return { x, y };
+
+    double a = std::sin(d_lat / 2) * std::sin(d_lat / 2) +
+               std::cos(c_lat) * std::cos(t_lat) * std::sin(d_lon / 2) * std::sin(d_lon / 2);
+    double c = 2 * std::atan2(std::sqrt(a), std::sqrt(1 - a));
+    double dist = earthRadius * c;
+
+    return { x, y, dist };
 }
 
 double Geolocation::bearingAngle(const Coordinate& current_coordinate, const Coordinate& target_coordinate) {
-    double t_lat = radiansToDegrees(target_coordinate.lat);
-    double t_lon = radiansToDegrees(target_coordinate.lon);
-    double c_lat = radiansToDegrees(current_coordinate.lat);
-    double c_lon = radiansToDegrees(current_coordinate.lon);
+    double t_lat = degreesToRadians(target_coordinate.lat);
+    double t_lon = degreesToRadians(target_coordinate.lon);
+    double c_lat = degreesToRadians(current_coordinate.lat);
+    double c_lon = degreesToRadians(current_coordinate.lon);
     double d_lon = t_lon - c_lon;
 
     double a = std::sin(d_lon) * std::cos(t_lat);
@@ -74,7 +68,10 @@ bool Geolocation::isinFieldOfView(const Coordinate& current_coordinate, const Co
 
     if ((angleDiff >= lowerBound && angleDiff <= upperBound) || 
         (lowerBound > upperBound && (angleDiff >= lowerBound || angleDiff <= upperBound))) {
-        return haversine(target_coordinate, current_coordinate) <= fovDistance_meter;
+            Position hav = haversine(target_coordinate, current_coordinate);
+        return hav.dist <= fovDistance_meter;
     }
     return false;
+}
+
 }

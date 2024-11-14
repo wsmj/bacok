@@ -4,12 +4,14 @@
 #include <px4_msgs/msg/vehicle_attitude_setpoint.hpp>
 #include <px4_msgs/msg/sensor_gps.hpp>
 #include <px4_msgs/msg/vehicle_attitude.hpp>
+#include <bohoso/msg/team_telemetry.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <cmath>
 #include <stdint.h>
 
 #include <bacok/dubinsPath.h>
 #include <bacok/frameTransport.h>
+#include <bacok/geolocation.h>
 
 #include <chrono>
 #include <iostream>
@@ -17,6 +19,7 @@
 using namespace std::chrono;
 using namespace std::chrono_literals;
 using namespace px4_msgs::msg;
+using namespace bohoso::msg;
 using std::placeholders::_1;
 
 class OffboardControl : public rclcpp::Node
@@ -26,6 +29,7 @@ public:
 	{
 		rmw_qos_profile_t qos_profile = rmw_qos_profile_sensor_data;
 		auto qos = rclcpp::QoS(rclcpp::QoSInitialization(qos_profile.history, 5), qos_profile);
+		team2_telemetry_subscriber_ = this->create_subscription<TeamTelemetry>("/team2/telemetry", qos, std::bind(&OffboardControl::team2_telemetry_callback, this, _1));
 		sensor_combined_subscriber_ = this->create_subscription<SensorGps>("/fmu/out/vehicle_gps_position", qos, std::bind(&OffboardControl::sensor_combined_callback, this, _1));
 		Vehicle_attitude_subscriber_ = this->create_subscription<VehicleAttitude>("/fmu/out/vehicle_attitude", qos, std::bind(&OffboardControl::attitude_callback, this, _1));
 
@@ -47,6 +51,8 @@ public:
 			RCLCPP_INFO(this->get_logger(), "yaw: %f", euler.yaw*180/M_PI);
 			RCLCPP_INFO(this->get_logger(), "\n\n\n");
 
+			// double turn_radius = 30;
+			// geo_utils::Position position;
 			
 
 		};
@@ -56,6 +62,7 @@ public:
 private:
 	rclcpp::TimerBase::SharedPtr timer_;
 
+	rclcpp::Subscription<TeamTelemetry>::SharedPtr team2_telemetry_subscriber_;
 	rclcpp::Subscription<SensorGps>::SharedPtr sensor_combined_subscriber_;
     rclcpp::Subscription<VehicleAttitude>::SharedPtr Vehicle_attitude_subscriber_;
 
@@ -67,6 +74,10 @@ private:
 
     VehicleAttitude::SharedPtr attitude_data;
     void attitude_callback(const VehicleAttitude::SharedPtr msg) {attitude_data = msg;}
+
+	TeamTelemetry::SharedPtr team2_telemetry;
+	void team2_telemetry_callback(const TeamTelemetry::SharedPtr msg) {team2_telemetry = msg;}
+
 
 	
 };

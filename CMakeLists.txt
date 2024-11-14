@@ -12,6 +12,7 @@ find_package(eigen3_cmake_module)
 find_package(Eigen3 REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(px4_msgs REQUIRED)
+find_package(bohoso REQUIRED)
 
 include_directories(include)
 
@@ -52,8 +53,8 @@ install(TARGETS processTelem
   DESTINATION lib/${PROJECT_NAME})
 
 add_executable(offboard_dubins src/offboard_dubins.cpp)
-ament_target_dependencies(offboard_dubins rclcpp px4_msgs)
-target_link_libraries(offboard_dubins dubinsPath frameTransport)
+ament_target_dependencies(offboard_dubins rclcpp px4_msgs bohoso)
+target_link_libraries(offboard_dubins dubinsPath frameTransport geolocation)
 install(TARGETS offboard_dubins
   DESTINATION lib/${PROJECT_NAME})
 
