@@ -12,6 +12,8 @@ find_package(eigen3_cmake_module)
 find_package(Eigen3 REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(px4_msgs REQUIRED)
+find_package(vision_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 find_package(bohoso REQUIRED)
 
 include_directories(include)
@@ -38,7 +40,8 @@ target_include_directories(geolocation PUBLIC
 )
 
 add_executable(attitude_control src/attitude_control.cpp)
-ament_target_dependencies(attitude_control rclcpp px4_msgs)
+ament_target_dependencies(attitude_control rclcpp px4_msgs vision_msgs std_msgs)
+target_link_libraries(attitude_control dubinsPath frameTransport geolocation)
 install(TARGETS attitude_control
   DESTINATION lib/${PROJECT_NAME})
 
