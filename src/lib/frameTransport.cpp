@@ -13,12 +13,12 @@ FrameTransport::Euler FrameTransport::toEuler(const Quaternion& q) {
 FrameTransport::Quaternion FrameTransport::toQuaternion(const Euler& e) {
     Quaternion q;
 
-    double cy = cos(e.yaw * 0.5);
-    double sy = sin(e.yaw * 0.5);
-    double cp = cos(e.pitch * 0.5);
-    double sp = sin(e.pitch * 0.5);
-    double cr = cos(e.roll * 0.5);
-    double sr = sin(e.roll * 0.5);
+    float cy = cos(e.yaw * 0.5);
+    float sy = sin(e.yaw * 0.5);
+    float cp = cos(e.pitch * 0.5);
+    float sp = sin(e.pitch * 0.5);
+    float cr = cos(e.roll * 0.5);
+    float sr = sin(e.roll * 0.5);
 
     q.w = cr * cp * cy + sr * sp * sy;
     q.x = sr * cp * cy - cr * sp * sy;

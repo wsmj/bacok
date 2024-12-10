@@ -3,16 +3,21 @@
 #include <px4_msgs/msg/vehicle_control_mode.hpp>
 #include <px4_msgs/msg/vehicle_attitude_setpoint.hpp>
 #include <px4_msgs/msg/sensor_gps.hpp>
+#include <vision_msgs/msg/pose2_d.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <cmath>
 #include <stdint.h>
 
+#include <bacok/frameTransport.h>
+
 #include <chrono>
 #include <iostream>
+
 
 using namespace std::chrono;
 using namespace std::chrono_literals;
 using namespace px4_msgs::msg;
+using namespace vision_msgs::msg;
 using std::placeholders::_1;
 
 class OffboardControl : public rclcpp::Node
@@ -22,11 +27,13 @@ public:
 	{
 		rmw_qos_profile_t qos_profile = rmw_qos_profile_sensor_data;
 		auto qos = rclcpp::QoS(rclcpp::QoSInitialization(qos_profile.history, 5), qos_profile);
+		
 		offboard_control_mode_publisher_ = this->create_publisher<OffboardControlMode>("/fmu/in/offboard_control_mode", 10);
 		vehicle_command_publisher_ = this->create_publisher<VehicleCommand>("/fmu/in/vehicle_command", 10);
 		vehicle_attitude_setpoint_publisher_ = this->create_publisher<VehicleAttitudeSetpoint>("/fmu/in/vehicle_attitude_setpoint", 10);
-		sensor_combined_subscriber_ = this->create_subscription<SensorGps>("/fmu/out/vehicle_gps_position", qos, std::bind(&OffboardControl::sensor_combined_callback, this, _1));
 		
+		sensor_combined_subscriber_ = this->create_subscription<SensorGps>("/fmu/out/vehicle_gps_position", qos, std::bind(&OffboardControl::sensor_combined_callback, this, _1));
+		target_frame_position_subscriber_ = this->create_subscription<Pose2D>("/target_frame_location", qos, std::bind(&OffboardControl::target_location_callback, this, _1));
 
 		offboard_setpoint_counter_ = 0;
 
@@ -35,11 +42,18 @@ public:
 			if (offboard_setpoint_counter_ == 10) {
 				// Change to Offboard mode after 10 setpoints
 				this->publish_vehicle_command(VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 6);
+				this->arm();
 			}
 
 			// offboard_control_mode needs to be paired with trajectory_setpoint
 			publish_offboard_control_mode();
-			publish_vehicle_attitude_setpoint();
+
+			if (target_frame_position && target_frame_position->position.x != 0 && target_frame_position->position.y != 0) {
+				publish_vehicle_attitude_setpoint();
+			}
+			else {
+				RCLCPP_WARN(this->get_logger(), "Target not found in the camera.");
+			}
 
 			// stop the counter after reaching 11
 			if (offboard_setpoint_counter_ < 11) {
@@ -47,7 +61,11 @@ public:
 			}
 		};
 		timer_ = this->create_wall_timer(100ms, timer_callback);
+		
+		// void set_offboard_mode();
+		void arm();
 	}
+
 
 private:
 	rclcpp::TimerBase::SharedPtr timer_;
@@ -56,21 +74,41 @@ private:
 	rclcpp::Publisher<VehicleCommand>::SharedPtr vehicle_command_publisher_;
 	rclcpp::Publisher<VehicleAttitudeSetpoint>::SharedPtr vehicle_attitude_setpoint_publisher_;
 	rclcpp::Subscription<SensorGps>::SharedPtr sensor_combined_subscriber_;
+	rclcpp::Subscription<Pose2D>::SharedPtr target_frame_position_subscriber_;
 
 	std::atomic<uint64_t> timestamp_;   
 
 	uint64_t offboard_setpoint_counter_;  
 
+    float calculate_centering(float target_value, float center_value, float max_angle, float max_value, bool invert_direction = false);
+
 	void publish_offboard_control_mode();
 	void publish_vehicle_attitude_setpoint();
-	void loiter_control();
-
 	void publish_vehicle_command(uint16_t command, float param1 = 0.0, float param2 = 0.0, float param3 = 0.0, float param4 = 0.0, float param5 = 0.0, float param6 = 0.0, float param7 = 0.0);
+	void set_offboard_mode();
+	void arm();
+
 
 	SensorGps::SharedPtr sensor_data;
 	void sensor_combined_callback(const SensorGps::SharedPtr msg) {sensor_data = msg;}
+
+	Pose2D::SharedPtr target_frame_position;
+	void target_location_callback(const Pose2D::SharedPtr msg) {target_frame_position = msg;}
 };
 
+float OffboardControl::calculate_centering(float target_value, float center_value, float max_angle, float max_value, bool invert_direction)
+{
+    if (target_value == center_value) {
+        return 0.0; // No adjustment needed when target is at the center
+    } else {
+        int direction = (target_value < center_value) ? 1 : -1;
+        if (invert_direction) {
+            direction *= -1; // Flip direction if needed
+        }
+        double ratio = static_cast<double>(std::abs(target_value - center_value)) / max_value;
+        return direction * (max_angle * ratio);
+    }
+}
 
 void OffboardControl::publish_offboard_control_mode()
 {
@@ -84,23 +122,50 @@ void OffboardControl::publish_offboard_control_mode()
 	offboard_control_mode_publisher_->publish(msg);
 }
 
+void OffboardControl::set_offboard_mode()
+{
+    VehicleCommand msg{};
+    msg.command = VehicleCommand::VEHICLE_CMD_DO_SET_MODE;
+    msg.param1 = 1; // Custom mode
+    msg.param2 = 6; // Offboard mode
+    msg.target_system = 1;
+    msg.target_component = 1;
+    msg.source_system = 1;
+    msg.source_component = 1;
+    msg.from_external = true;
+    msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
+    vehicle_command_publisher_->publish(msg);
+}
+
+void OffboardControl::arm()
+{
+    VehicleCommand msg{};
+    msg.command = VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM;
+    msg.param1 = 1.0; // Arm
+    msg.target_system = 1;
+    msg.target_component = 1;
+    msg.source_system = 1;
+    msg.source_component = 1;
+    msg.from_external = true;
+    msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
+    vehicle_command_publisher_->publish(msg);
+}
 
 void OffboardControl::publish_vehicle_attitude_setpoint()
 {
-    VehicleAttitudeSetpoint msg{};
+	VehicleAttitudeSetpoint msg{};
 
-    double roll_value = sin(static_cast<double>(this->get_clock()->now().nanoseconds() / 1000000) / 2000);  // Adjust time scaling if needed
+	float roll = calculate_centering(target_frame_position->position.x, 640.0f, 0.5f, 640.0f, true);
+    float pitch = calculate_centering(target_frame_position->position.y, 360.0f, 0.5f, 360.0f);
 
-    double half_roll = roll_value / 3.0;
-    msg.q_d = {float(cos(half_roll)), float(sin(half_roll)), 0.0, 0.0};  // Quaternion for roll (q_d = [w, x, y, z])
+	RCLCPP_INFO(this->get_logger(), "Euler: %f, %f, %f", roll, pitch, 0.0);
+	FrameTransport::Quaternion q = FrameTransport::toQuaternion({roll, pitch, 0.0});
+	RCLCPP_INFO(this->get_logger(), "Quaternion: %f %f %f %f", q.w, q.x, q.y, q.z);
 
-    msg.thrust_body = {0.35, 0.0, 0.0};
-
-    msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
-
-    vehicle_attitude_setpoint_publisher_->publish(msg);
-
-    RCLCPP_INFO(this->get_logger(), "Published roll: %f radians (converted to quaternion)", roll_value);
+	msg.q_d = {q.w, q.x, q.y, q.z};
+	msg.thrust_body = {0.36, 0.0, 0.0};
+	msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
+	vehicle_attitude_setpoint_publisher_->publish(msg);
 }
 
 

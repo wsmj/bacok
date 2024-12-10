@@ -34,8 +34,6 @@ public:
 
             // Publish the offboard control mode
             publish_offboard_control_mode();
-
-            // Send trajectory setpoints for takeoff (airspeed and altitude)
             publish_trajectory_setpoint();
 
             // Increment the counter up to a limit
