@@ -14,16 +14,16 @@ def generate_launch_description():
         # ),
         Node(
             package='bacok',
-            executable='attitude_control',
-            name='dubins',
+            executable='takeoff',
+            name='takeoff',
             output='screen',
             remappings=[
                 ('/fmu/in/offboard_control_mode', '/px4_1/fmu/in/offboard_control_mode'),
                 ('/fmu/in/vehicle_command', '/px4_1/fmu/in/vehicle_command'),
-                ('/fmu/in/vehicle_attitude_setpoint', '/px4_1/fmu/in/vehicle_attitude_setpoint'),
+                # ('/fmu/in/vehicle_attitude_setpoint', '/px4_1/fmu/in/vehicle_attitude_setpoint'),
                 # ('/fmu/out/vehicle_attitude', '/px4_1/fmu/out/vehicle_attitude'),
-                ('/fmu/out/vehicle_gps_position', '/px4_1/fmu/out/vehicle_gps_position')
-
+                # ('/fmu/out/vehicle_gps_position', '/px4_1/fmu/out/vehicle_gps_position')
+                ('/fmu/in/trajectory_setpoint', '/px4_1/fmu/in/trajectory_setpoint'),
             ]
         )
         # ExecuteProcess(

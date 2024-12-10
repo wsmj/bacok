@@ -6,11 +6,11 @@
 class FrameTransport {
 public:
     struct Quaternion {
-        double w, x, y, z;
+        float w, x, y, z;
     };
 
     struct Euler {
-        double roll, pitch, yaw;
+        float roll, pitch, yaw;
     };
 
     static Euler toEuler(const Quaternion& q);

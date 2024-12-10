@@ -42,11 +42,18 @@ public:
 			if (offboard_setpoint_counter_ == 10) {
 				// Change to Offboard mode after 10 setpoints
 				this->publish_vehicle_command(VehicleCommand::VEHICLE_CMD_DO_SET_MODE, 1, 6);
+				this->arm();
 			}
 
 			// offboard_control_mode needs to be paired with trajectory_setpoint
 			publish_offboard_control_mode();
-			publish_vehicle_attitude_setpoint();
+
+			if (target_frame_position && target_frame_position->position.x != 0 && target_frame_position->position.y != 0) {
+				publish_vehicle_attitude_setpoint();
+			}
+			else {
+				RCLCPP_WARN(this->get_logger(), "Target not found in the camera.");
+			}
 
 			// stop the counter after reaching 11
 			if (offboard_setpoint_counter_ < 11) {
@@ -54,7 +61,11 @@ public:
 			}
 		};
 		timer_ = this->create_wall_timer(100ms, timer_callback);
+		
+		// void set_offboard_mode();
+		void arm();
 	}
+
 
 private:
 	rclcpp::TimerBase::SharedPtr timer_;
@@ -69,9 +80,14 @@ private:
 
 	uint64_t offboard_setpoint_counter_;  
 
+    float calculate_centering(float target_value, float center_value, float max_angle, float max_value, bool invert_direction = false);
+
 	void publish_offboard_control_mode();
 	void publish_vehicle_attitude_setpoint();
 	void publish_vehicle_command(uint16_t command, float param1 = 0.0, float param2 = 0.0, float param3 = 0.0, float param4 = 0.0, float param5 = 0.0, float param6 = 0.0, float param7 = 0.0);
+	void set_offboard_mode();
+	void arm();
+
 
 	SensorGps::SharedPtr sensor_data;
 	void sensor_combined_callback(const SensorGps::SharedPtr msg) {sensor_data = msg;}
@@ -79,6 +95,20 @@ private:
 	Pose2D::SharedPtr target_frame_position;
 	void target_location_callback(const Pose2D::SharedPtr msg) {target_frame_position = msg;}
 };
+
+float OffboardControl::calculate_centering(float target_value, float center_value, float max_angle, float max_value, bool invert_direction)
+{
+    if (target_value == center_value) {
+        return 0.0; // No adjustment needed when target is at the center
+    } else {
+        int direction = (target_value < center_value) ? 1 : -1;
+        if (invert_direction) {
+            direction *= -1; // Flip direction if needed
+        }
+        double ratio = static_cast<double>(std::abs(target_value - center_value)) / max_value;
+        return direction * (max_angle * ratio);
+    }
+}
 
 void OffboardControl::publish_offboard_control_mode()
 {
@@ -92,46 +122,49 @@ void OffboardControl::publish_offboard_control_mode()
 	offboard_control_mode_publisher_->publish(msg);
 }
 
+void OffboardControl::set_offboard_mode()
+{
+    VehicleCommand msg{};
+    msg.command = VehicleCommand::VEHICLE_CMD_DO_SET_MODE;
+    msg.param1 = 1; // Custom mode
+    msg.param2 = 6; // Offboard mode
+    msg.target_system = 1;
+    msg.target_component = 1;
+    msg.source_system = 1;
+    msg.source_component = 1;
+    msg.from_external = true;
+    msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
+    vehicle_command_publisher_->publish(msg);
+}
+
+void OffboardControl::arm()
+{
+    VehicleCommand msg{};
+    msg.command = VehicleCommand::VEHICLE_CMD_COMPONENT_ARM_DISARM;
+    msg.param1 = 1.0; // Arm
+    msg.target_system = 1;
+    msg.target_component = 1;
+    msg.source_system = 1;
+    msg.source_component = 1;
+    msg.from_external = true;
+    msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
+    vehicle_command_publisher_->publish(msg);
+}
+
 void OffboardControl::publish_vehicle_attitude_setpoint()
 {
-
-	if (!target_frame_position) {
-		RCLCPP_WARN(this->get_logger(), "No target frame position received yet.");
-		return; // Exit the function if no data has been received
-	}
-	
 	VehicleAttitudeSetpoint msg{};
 
-	float roll;
-
-	int target_x = target_frame_position->position.x;
-
-	if (target_x == 640) roll = 0;
-	else {
-		int direction = (target_x < 640) ? -1 : 1;
-		double ratio = static_cast<double>(std::abs(target_x - 640)) / 640.0;
-		roll = direction * (8.0 * ratio);
-	}
-
-	float pitch;
-	int target_y = target_frame_position->position.y;
-
-	if (target_y == 360) pitch = 0;
-	else {
-		int direction = (target_y < 360) ? 1 : -1;
-		double ratio = static_cast<double>(std::abs(target_y - 360)) / 360.0;
-		pitch = direction * (5.0 * ratio);
-	}
+	float roll = calculate_centering(target_frame_position->position.x, 640.0f, 0.5f, 640.0f, true);
+    float pitch = calculate_centering(target_frame_position->position.y, 360.0f, 0.5f, 360.0f);
 
 	RCLCPP_INFO(this->get_logger(), "Euler: %f, %f, %f", roll, pitch, 0.0);
 	FrameTransport::Quaternion q = FrameTransport::toQuaternion({roll, pitch, 0.0});
 	RCLCPP_INFO(this->get_logger(), "Quaternion: %f %f %f %f", q.w, q.x, q.y, q.z);
 
-	msg.q_d = {float(q.w), float(q.x), float(q.y), float(q.z)};
-		
-	msg.thrust_body = {0.35, 0.0, 0.0};
+	msg.q_d = {q.w, q.x, q.y, q.z};
+	msg.thrust_body = {0.36, 0.0, 0.0};
 	msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
-
 	vehicle_attitude_setpoint_publisher_->publish(msg);
 }
 
